@@ -1,0 +1,11 @@
+# 로컬에서 동작을 확인한 버전으로 고정했습니다.
+# 상담 앱에 필요한 것만 담았습니다(평가 체인 제외).
+langchain-core==1.6.3
+langchain-openai==1.6.2
+pydantic==2.12.5
+python-dotenv==1.2.2
+pypdf==6.18.1
+pymupdf==1.28.2
+scikit-learn==1.9.0
+numpy==2.4.6
+pillow==12.3.0

@@ -2,7 +2,7 @@
 # 무료 티어는 RAM 512MB, 15분 미접속 시 절전 후 다음 접속에서 다시 깨어납니다.
 services:
   - type: web
-    name: washer-service-agent
+    name: homeappliance-repair-service-chatagent
     runtime: python
     plan: free
     region: singapore

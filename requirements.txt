@@ -1,5 +1,6 @@
 # 로컬에서 동작을 확인한 버전으로 고정했습니다.
 # 상담 앱에 필요한 것만 담았습니다(평가 체인 제외).
+gradio==6.27.0
 langchain-core==1.6.3
 langchain-openai==1.6.2
 pydantic==2.12.5

@@ -17,6 +17,7 @@ import json
 import unicodedata
 from pathlib import Path
 from functools import lru_cache
+import gc
 import numpy as np
 from dotenv import load_dotenv
 
@@ -25,8 +26,8 @@ load_dotenv(BASE_DIR / ".env", override=True)
 load_dotenv(BASE_DIR.parent / ".env", override=False)  # 로컬에서 상위 폴더 .env도 함께 찾습니다.
 MODEL_NAME = "gpt-4o-mini"
 PDF_NAME = "wachingmachine_service_manual.pdf"
-# 파일명이 바뀌어도 찾을 수 있게 남겨 둔 예전 이름들입니다.
-PDF_FALLBACK_NAMES = ["manual.pdf", "세탁기_서비스매뉴얼_WM_KOR_MFL71831423_06_251224_00_OM_WEB.pdf"]
+# 파일명이 바뀌어도 찾을 수 있게 예전 이름도 후보로 둡니다(맥에서는 한글 파일명이 자소 분리될 수 있어 NFC로 비교합니다).
+PDF_FALLBACK_NAMES = ["세탁기_서비스매뉴얼_WM_KOR_MFL71831423_06_251224_00_OM_WEB.pdf", "manual.pdf"]
 TOP_K = 5
 
 def find_pdf():
@@ -109,6 +110,11 @@ def retrieve(question):
     return [{"page": doc.metadata["page"], "text": doc.page_content, "score": doc.metadata["score"], "code_priority": doc.metadata["code_priority"]} for doc in retriever.invoke(question)]
 
 print(f"PDF 전체 {len(reader.pages)}페이지 / 세탁기 검색 대상 {len(washer_documents)}페이지")
+
+# 색인을 만든 뒤에는 PDF 파서와 전체 페이지 텍스트가 필요 없습니다.
+# 무료 호스팅의 메모리 한도(512MB)를 맞추기 위해 해제합니다.
+del reader, page_texts
+gc.collect()
 
 
 # ===== 3. 예시 질문 (노트북 3절) =====
@@ -339,7 +345,7 @@ ARCH_SLIDE_IMAGE = BASE_DIR / "assets" / "langchain_architecture_slide.png"
 ARCH_DETAIL_IMAGE = BASE_DIR / "assets" / "langchain_architecture.png"
 EMPTY_STATUS = "### 상담 판단\n질문을 입력하면 분류·판단 이유·근거 페이지가 여기에 표시됩니다."
 
-@lru_cache(maxsize=32)
+@lru_cache(maxsize=6)  # 1쪽당 약 2.4MB. 무료 호스팅 메모리 한도를 위해 32에서 줄였습니다.
 def page_image(page_number):
     """매뉴얼 페이지를 PIL 이미지로 렌더링합니다. 같은 페이지는 캐시를 재사용합니다."""
     from PIL import Image as PILImage

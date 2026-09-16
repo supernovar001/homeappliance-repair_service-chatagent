@@ -34,6 +34,15 @@ wachingmachine_service_manual.pdf   세탁기 서비스 매뉴얼 (검색 대상
 assets/         LangChain 구성도 이미지
 ```
 
+## Render 배포
+
+`render.yaml` 이 포함되어 있습니다. Render 대시보드에서 이 GitHub 레포를 연결하면
+빌드·시작 명령과 Python 버전이 자동으로 잡힙니다. `OPENAI_API_KEY` 만 대시보드에서 입력하면 됩니다.
+
+무료 티어 제약:
+- RAM 512MB (이 앱의 실측 최대 사용량 약 423MB)
+- 15분 미접속 시 절전, 다음 접속 시 기동에 1분 정도 걸립니다
+
 ## 로컬 실행
 
 ```bash

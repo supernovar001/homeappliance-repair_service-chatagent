@@ -1,0 +1,18 @@
+# Render 배포 설정 (Blueprint)
+# 무료 티어는 RAM 512MB, 15분 미접속 시 절전 후 다음 접속에서 다시 깨어납니다.
+services:
+  - type: web
+    name: washer-service-agent
+    runtime: python
+    plan: free
+    region: singapore
+    buildCommand: pip install -r requirements.txt
+    # app.py 가 PORT 환경변수를 읽어 0.0.0.0 에 바인딩합니다.
+    startCommand: python app.py
+    healthCheckPath: /
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      # 대시보드에서 직접 입력합니다. 레포에 키를 넣지 않습니다.
+      - key: OPENAI_API_KEY
+        sync: false

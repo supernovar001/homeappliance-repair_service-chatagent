@@ -476,7 +476,7 @@ with gr.Blocks(title="워시타워 세탁기 A/S 상담") as demo:
             )
         with gr.Tab("📋 프로젝트 소개"):
             gr.Markdown(
-                "**제작자** : 조해수 · gotn3439@gmail.com  \n"
+                "**제작자** : 조해수 · gotn3439[at]gmail.com  \n"
                 "SKALA 2026 · 생성형 AI 서비스 개발의 이해 활용 (LangChain) 과제"
             )
             gr.Markdown(INTRO_MD_TOP)

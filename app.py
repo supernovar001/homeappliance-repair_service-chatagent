@@ -446,13 +446,13 @@ with gr.Blocks(title="워시타워 세탁기 A/S 상담") as demo:
     )
     history_state = gr.State([])
     with gr.Tabs():
-        with gr.Tab("📋 프로젝트 소개"):
-            gr.Markdown(INTRO_MD_TOP)
-            if ARCH_SLIDE_IMAGE.exists():
-                gr.Image(value=str(ARCH_SLIDE_IMAGE), show_label=False, interactive=False)
-            gr.Markdown(INTRO_MD_BOTTOM)
-            gr.Markdown(RUBRIC_MD)
         with gr.Tab("💬 상담"):
+            gr.Markdown(
+                "#### 이렇게 사용하세요\n"
+                "1. 아래 **고객 질문** 칸에 증상을 적고 **보내기**를 누르세요. 이어서 되묻는 후속 질문도 가능합니다.\n"
+                "2. 무엇을 물어볼지 막막하면 아래 **예시 질문**을 눌러 사용해도 좋아요.\n"
+                "3. 오른쪽에 판단 결과와 근거가 된 매뉴얼 페이지가 함께 표시됩니다."
+            )
             with gr.Row():
                 with gr.Column(scale=3):
                     chatbot = gr.Chatbot(label="상담 대화", height=520)
@@ -474,6 +474,16 @@ with gr.Blocks(title="워시타워 세탁기 A/S 상담") as demo:
                 "<sub>자가 점검 안내는 해결을 보장하지 않으며, '서비스 기사 점검 권장'은 실제 방문 예약이 아닙니다. "
                 "누수로 전원 주변이 젖었거나 연기·타는 냄새가 나면 즉시 사용을 멈추고 서비스 센터에 문의하세요.</sub>"
             )
+        with gr.Tab("📋 프로젝트 소개"):
+            gr.Markdown(
+                "**제작자** : 조해수 · gotn3439@gmail.com  \n"
+                "SKALA 2026 · 생성형 AI 서비스 개발의 이해 활용 (LangChain) 과제"
+            )
+            gr.Markdown(INTRO_MD_TOP)
+            if ARCH_SLIDE_IMAGE.exists():
+                gr.Image(value=str(ARCH_SLIDE_IMAGE), show_label=False, interactive=False)
+            gr.Markdown(INTRO_MD_BOTTOM)
+            gr.Markdown(RUBRIC_MD)
         with gr.Tab("🧩 LangChain 구성도"):
             gr.Markdown(
                 "**RAG 구조를 LangChain으로 구현했습니다.** 질문은 ① 범위 분류 체인 → ② RAG 검색(BaseRetriever) → "

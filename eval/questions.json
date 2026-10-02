@@ -1,0 +1,53 @@
+[
+  {
+    "id": "Q01", "type": "정답이 명확한 질문", "purpose": "기본 검색 성능",
+    "question": "급수구 거름망은 어떻게 청소하나요?",
+    "required_groups": [[40]]
+  },
+  {
+    "id": "Q02", "type": "정답이 명확한 질문", "purpose": "기본 검색 성능",
+    "question": "통살균 코스는 얼마나 자주 해야 하나요?",
+    "required_groups": [[41, 42, 56]]
+  },
+  {
+    "id": "Q03", "type": "표현이 다른 질문", "purpose": "의미 검색",
+    "question": "빨래를 다 하고 꺼냈는데 옷에서 쉰내가 나요.",
+    "required_groups": [[58, 41]]
+  },
+  {
+    "id": "Q04", "type": "표현이 다른 질문", "purpose": "의미 검색",
+    "question": "탈수할 때 세탁기가 덜덜거리면서 자리에서 조금씩 움직여요.",
+    "required_groups": [[58, 59, 55]]
+  },
+  {
+    "id": "Q05", "type": "키워드가 정확한 질문", "purpose": "키워드/하이브리드 검색",
+    "question": "세탁기 화면에 1E라고 떠요. 어떻게 해야 하나요?",
+    "required_groups": [[55, 40]],
+    "note": "표시창의 IE를 고객이 숫자 1E로 읽은 경우(매뉴얼 40쪽 원문도 '1E'로 추출됨)"
+  },
+  {
+    "id": "Q06", "type": "키워드가 정확한 질문", "purpose": "키워드/하이브리드 검색",
+    "question": "dE4가 떠요.",
+    "required_groups": [[56]]
+  },
+  {
+    "id": "Q07", "type": "복합 질문", "purpose": "decomposition 필요성",
+    "question": "IE가 뜨는데 겨울이라 급수 호스가 얼었을 수도 있어요. 녹이는 방법이랑 거름망 청소 방법을 둘 다 알려주세요.",
+    "required_groups": [[43, 55], [40]]
+  },
+  {
+    "id": "Q08", "type": "복합 질문", "purpose": "decomposition 필요성",
+    "question": "UE가 떠서 이불을 한 장씩 나눠 빨았는데, 이번에는 빨래에서 냄새가 나요. 두 가지 다 어떻게 해야 하나요?",
+    "required_groups": [[55], [58, 41]]
+  },
+  {
+    "id": "Q09", "type": "문서에 없는 질문", "purpose": "근거 없음 처리",
+    "question": "세탁기 무상 보증기간이 몇 년인가요?",
+    "required_groups": [], "expect_no_evidence": true
+  },
+  {
+    "id": "Q10", "type": "문서에 없는 질문", "purpose": "근거 없음 처리",
+    "question": "세탁기 수리 기사님 출장비는 얼마인가요?",
+    "required_groups": [], "expect_no_evidence": true
+  }
+]

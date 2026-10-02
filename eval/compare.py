@@ -1,11 +1,17 @@
 # -*- coding: utf-8 -*-
 """Baseline과 개선 Pipeline 비교 (14.7)
 
-같은 질문 집합으로 실행한 두 결과 파일을 비교해 표를 만듭니다.
-  python eval/compare.py eval/results/<baseline>.json eval/results/<개선>.json
+같은 질문 집합으로 실행한 결과 파일 2개 이상을 순서대로 비교해 표를 만듭니다.
+  python eval/compare.py <baseline.json> <개선.json>
+  python eval/compare.py <baseline.json> <current.json> <improved.json>
+  python eval/compare.py <baseline.json> <improved.json> --notes eval/changes/baseline_to_improved.md
+  (--notes: 변경 이력 등 사람이 쓴 md를 비교 문서 앞부분에 넣습니다)
 
-판단 순서: 문서 근거 여부 → 정답 문서 포함 여부 → 그룹 재현율 → 첫 정답 순위
-답변 변화의 '좋아짐/나빠짐'은 이 순서로 처음 달라지는 항목으로 정합니다.
+파일을 넘긴 순서가 개선 단계 순서입니다. 인접한 두 단계(예: baseline→current, current→improved)와
+처음→마지막(baseline→improved)의 변화를 함께 기록합니다.
+
+자동 판정 순서: 문서 근거 여부 → 정답 문서 포함 여부 → 그룹 재현율 → 첫 정답 순위
+답변 내용은 보지 않으므로, 답변 비교 표의 '검토' 칸에 사람이 직접 판정합니다.
 """
 import json
 import sys
@@ -26,12 +32,16 @@ def mark(value):
 def search_cell(r):
     hit = "-" if r["hit"] is None else ("O" if r["hit"] else "X")
     rank = f" {r['first_rank']}위" if r["first_rank"] else ""
-    return f"포함 {hit}{rank} · {r['retrieved_pages']}"
+    return f"포함 {hit}{rank}<br>{r['retrieved_pages']}"
 
 
 def score(r):
     # 비교용 순서쌍: 클수록 좋음
     return (bool(r["grounded"]), bool(r["hit"]), r["group_recall"] or 0, -(r["first_rank"] or 99))
+
+
+def change(a, b):
+    return "좋아짐" if score(b) > score(a) else "나빠짐" if score(b) < score(a) else "동일"
 
 
 def reasons(a, b):
@@ -51,69 +61,107 @@ def reasons(a, b):
     fixed = sorted({p["detail"] for p in a["problems"]} - {p["detail"] for p in b["problems"]})
     new = sorted({p["detail"] for p in b["problems"]} - {p["detail"] for p in a["problems"]})
     notes += [f"해소: {d}" for d in fixed] + [f"새 문제: {d}" for d in new]
-    return " / ".join(notes) or "검색·답변 지표 변화 없음"
+    return "<br>".join(cell(n) for n in notes) or "변화 없음"
+
+
+def same_search(a, b):
+    ids_a, ids_b = [d["chunk_id"] for d in a["top_k"]], [d["chunk_id"] for d in b["top_k"]]
+    return "같음" if ids_a == ids_b else ("순서만 다름" if sorted(ids_a) == sorted(ids_b) else "다름")
+
+
+def text_similarity(a, b):
+    if a["answer"] == b["answer"]:
+        return "완전히 같음"
+    return f"{SequenceMatcher(None, a['answer'], b['answer']).ratio():.0%}"
 
 
 def summary(rows):
     scored = [r for r in rows if r["hit"] is not None]
-    hit = sum(bool(r["hit"]) for r in scored)
-    grounded = sum(bool(r["grounded"]) for r in rows)
     mrr = sum(1 / r["first_rank"] if r["first_rank"] else 0 for r in scored) / max(1, len(scored))
-    return hit, len(scored), grounded, len(rows), mrr
+    verdicts = [r.get("verdict") for r in rows if r.get("verdict")]
+    return {
+        "hit": f"{sum(bool(r['hit']) for r in scored)}/{len(scored)}",
+        "mrr": f"{mrr:.2f}",
+        "grounded": f"{sum(bool(r['grounded']) for r in rows)}/{len(rows)}",
+        "review": (f"O {verdicts.count('O')} · △ {verdicts.count('△')} · X {verdicts.count('X')}" if len(verdicts) == len(rows) else "미검토"),
+    }
 
 
 def main():
-    if len(sys.argv) != 3:
-        sys.exit("사용법: python eval/compare.py <baseline.json> <개선.json>")
-    base, new = (json.loads(Path(p).read_text(encoding="utf-8")) for p in sys.argv[1:])
-    if [q["question"] for q in base["questions"]] != [q["question"] for q in new["questions"]]:
-        sys.exit("두 결과의 질문 집합이 다릅니다. 같은 questions.json으로 실행한 결과만 비교할 수 있습니다.")
+    args = sys.argv[1:]
+    notes = None
+    if "--notes" in args:
+        i = args.index("--notes")
+        notes = Path(args[i + 1]).read_text(encoding="utf-8").strip()
+        args = args[:i] + args[i + 2:]
+    paths = args
+    if len(paths) < 2:
+        sys.exit("사용법: python eval/compare.py <baseline.json> <개선.json> [<개선2.json> ...]")
+    runs = [json.loads(Path(p).read_text(encoding="utf-8")) for p in paths]
+    questions = runs[0]["questions"]
+    if any([q["question"] for q in r["questions"]] != [q["question"] for q in questions] for r in runs[1:]):
+        sys.exit("결과들의 질문 집합이 다릅니다. 같은 questions.json으로 실행한 결과만 비교할 수 있습니다.")
 
-    bh, bn, bg, bt, bm = summary(base["results"])
-    nh, nn, ng, nt, nm = summary(new["results"])
-    lines = [
-        f"# Baseline과 개선 Pipeline 비교: {base['label']} vs {new['label']}", "",
-        f"- Baseline: `{base['mode']}` — {base.get('description', '')}",
-        f"- 개선: `{new['mode']}` — {new.get('description', '')}",
-        f"- 작성 시각: {datetime.now():%Y-%m-%d %H:%M}", "",
-        "## 요약", "",
-        "| 지표 | Baseline | 개선 |", "|---|---|---|",
-        f"| 정답 문서 포함 | {bh}/{bn} | {nh}/{nn} |",
-        f"| MRR | {bm:.2f} | {nm:.2f} |",
-        f"| 문서 근거 있는 답변 | {bg}/{bt} | {ng}/{nt} |", "",
-        "## 질문별 비교", "",
-        "| 질문 | Baseline 검색 | 개선 검색 | 답변 변화 | 판단 근거 |", "|---|---|---|---|---|",
-    ]
-    tally = {"좋아짐": 0, "동일": 0, "나빠짐": 0}
-    for q, a, b in zip(base["questions"], base["results"], new["results"]):
-        change = "좋아짐" if score(b) > score(a) else "나빠짐" if score(b) < score(a) else "동일"
-        tally[change] += 1
-        lines.append(f"| {q['id']} ({q['type']}) | {search_cell(a)} | {search_cell(b)} | {change} | {reasons(a, b)} |")
-    lines += ["", f"좋아짐 {tally['좋아짐']} · 동일 {tally['동일']} · 나빠짐 {tally['나빠짐']}"]
+    labels = [r["label"] for r in runs]
+    steps = [(i, i + 1) for i in range(len(runs) - 1)]
+    if len(runs) > 2:
+        steps.append((0, len(runs) - 1))  # 처음→마지막(전체 개선 효과)
+    step_name = lambda s: f"{labels[s[0]]}→{labels[s[1]]}"
 
-    # 같은 질문에 대한 두 답변을 나란히 놓고 사람이 직접 판정하는 표
+    lines = [f"# Baseline과 개선 Pipeline 비교: {' vs '.join(labels)}", ""]
+    lines += [f"- `{r['label']}` — {r.get('description', '')}" for r in runs]
+    lines += [f"- 작성 시각: {datetime.now():%Y-%m-%d %H:%M}", ""]
+    if notes:
+        lines += [notes, "", "---", "", "아래는 결과 파일에서 자동으로 만든 비교입니다.", ""]
+
+    sums = [summary(r["results"]) for r in runs]
+    lines += ["## 자동 비교 요약", "", "| 지표 | " + " | ".join(labels) + " |", "|---|" + "---|" * len(runs)]
+    for key, name in [("hit", "정답 문서 포함"), ("mrr", "MRR"), ("grounded", "문서 근거 있는 답변(자동)"), ("review", "답변 수동 검토")]:
+        lines.append(f"| {name} | " + " | ".join(s[key] for s in sums) + " |")
+
+    lines += ["", "## 단계별 변화 (자동 판정)", "", "| 단계 | 좋아짐 | 동일 | 나빠짐 | 좋아진 질문 | 나빠진 질문 |", "|---|---|---|---|---|---|"]
+    for s in steps:
+        res = [change(runs[s[0]]["results"][i], runs[s[1]]["results"][i]) for i in range(len(questions))]
+        up = [q["id"] for q, c in zip(questions, res) if c == "좋아짐"]
+        down = [q["id"] for q, c in zip(questions, res) if c == "나빠짐"]
+        lines.append(f"| {step_name(s)} | {res.count('좋아짐')} | {res.count('동일')} | {res.count('나빠짐')} | {', '.join(up) or '-'} | {', '.join(down) or '-'} |")
+
+    lines += ["", "## 질문별 검색·지표 비교", "",
+              "| 질문 | " + " | ".join(f"{l} 검색" for l in labels) + " | " + " | ".join(step_name(s) for s in steps) + " |",
+              "|---|" + "---|" * (len(runs) + len(steps))]
+    for i, q in enumerate(questions):
+        searches = [search_cell(r["results"][i]) for r in runs]
+        deltas = []
+        for s in steps:
+            a, b = runs[s[0]]["results"][i], runs[s[1]]["results"][i]
+            deltas.append(f"**{change(a, b)}**<br>{reasons(a, b)}")
+        lines.append(f"| {q['id']} ({q['type']}) | " + " | ".join(searches + deltas) + " |")
+
     lines += [
         "", "## 답변 비교 (수동 검토용)", "",
-        "같은 질문에 대한 두 답변을 나란히 놓았습니다. '자동 판정'은 위 표의 지표 기준이며, 답변 내용까지는 보지 않습니다.",
-        "'검토' 칸에 직접 **동일 / 좋아짐 / 나빠짐**을 적어 주세요. '텍스트'는 두 답변 문장이 얼마나 같은지(difflib 유사도)입니다.",
-        "'검색 결과'가 같은데 답변이 다르면, 그 차이는 검색이 아니라 답변 모델의 실행마다의 변동입니다(개선 효과로 보면 안 됨).", "",
-        f"| 질문 | {base['label']} 답변 | {new['label']} 답변 | 검색 결과 | 텍스트 | 자동 판정 | 검토 |", "|---|---|---|---|---|---|---|",
+        "같은 질문에 대한 답변을 단계별로 나란히 놓았습니다. '자동'은 위 지표 기준이며 답변 내용은 보지 않습니다.",
+        "'검색'이 같은데 답변이 다르면 그 차이는 검색이 아니라 답변 생성(프롬프트 변경 또는 실행마다의 변동) 때문입니다.",
+        "'검토' 칸에 직접 **동일 / 좋아짐 / 나빠짐**을 적어 주세요. 답변 아래 _검토: O/△/X_ 는 각 결과 기록에 남긴 수동 판정입니다.", "",
+        "| 질문 | " + " | ".join(f"{l} 답변" for l in labels) + " | " + " | ".join(f"{step_name(s)}<br>(검색 · 텍스트 · 자동)" for s in steps)
+        + " | " + " | ".join(f"검토<br>{step_name(s)}" for s in steps) + " |",
+        "|---|" + "---|" * (len(runs) + 2 * len(steps)),
     ]
-    for q, a, b in zip(base["questions"], base["results"], new["results"]):
-        change = "좋아짐" if score(b) > score(a) else "나빠짐" if score(b) < score(a) else "동일"
-        ratio = SequenceMatcher(None, a["answer"], b["answer"]).ratio()
-        text = "완전히 같음" if a["answer"] == b["answer"] else f"다름 (유사도 {ratio:.0%})"
-        question = f"**{q['id']}** {q['type']}<br>{cell(q['question'])}"
-        answer_a = f"{cell(a['answer'])}<br>_인용: {a['cited_pages'] or '-'}_"
-        answer_b = f"{cell(b['answer'])}<br>_인용: {b['cited_pages'] or '-'}_"
-        ids_a, ids_b = [d["chunk_id"] for d in a["top_k"]], [d["chunk_id"] for d in b["top_k"]]
-        search = "같음" if ids_a == ids_b else ("같은 청크, 순서만 다름" if sorted(ids_a) == sorted(ids_b) else "다름")
-        lines.append(f"| {question} | {answer_a} | {answer_b} | {search} | {text} | {change} | |")
+    for i, q in enumerate(questions):
+        answers = []
+        for r in runs:
+            row = r["results"][i]
+            verdict = f" · _검토: {row['verdict']}_" if row.get("verdict") else ""
+            answers.append(f"{cell(row['answer'])}<br>_인용: {row['cited_pages'] or '-'}_{verdict}")
+        deltas = []
+        for s in steps:
+            a, b = runs[s[0]]["results"][i], runs[s[1]]["results"][i]
+            deltas.append(f"검색 {same_search(a, b)}<br>텍스트 {text_similarity(a, b)}<br>자동 {change(a, b)}")
+        lines.append(f"| **{q['id']}** {q['type']}<br>{cell(q['question'])} | " + " | ".join(answers + deltas) + " |" + " |" * len(steps))
 
-    out = Path(sys.argv[2]).with_name(f"compare_{base['label']}_vs_{new['label']}.md")
+    out = Path(paths[-1]).with_name(f"compare_{'_vs_'.join(labels)}.md")
     out.write_text("\n".join(lines), encoding="utf-8")
-    print("\n".join(lines))
-    print(f"\n기록: {out}")
+    print("\n".join(lines[: lines.index("## 질문별 검색·지표 비교")]))
+    print(f"기록: {out}")
 
 
 if __name__ == "__main__":

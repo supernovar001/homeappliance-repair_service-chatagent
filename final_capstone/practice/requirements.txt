@@ -3,9 +3,11 @@
 gradio==6.27.0
 langchain-core==1.6.3
 langchain-openai==1.6.2
+langchain-community==0.4.2
 pydantic==2.12.5
 python-dotenv==1.2.2
 pypdf==6.18.1
+rank-bm25==0.2.2
 pymupdf==1.28.2
 langchain-text-splitters==1.1.2
 numpy==2.4.6

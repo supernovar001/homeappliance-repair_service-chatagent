@@ -3,16 +3,15 @@
 services:
   - type: web
     name: homeappliance-repair-service-chatagent
-    runtime: python
+    # final_capstone/practice/Dockerfile로 이미지를 빌드해 실행합니다.
+    runtime: docker
+    # 경로는 레포 루트 기준입니다.
+    dockerfilePath: ./final_capstone/practice/Dockerfile
+    dockerContext: ./final_capstone/practice
     plan: free
     region: singapore
-    buildCommand: pip install -r requirements.txt
-    # app.py 가 PORT 환경변수를 읽어 0.0.0.0 에 바인딩합니다.
-    startCommand: python app.py
     healthCheckPath: /
     envVars:
-      - key: PYTHON_VERSION
-        value: 3.11.9
       # 대시보드에서 직접 입력합니다. 레포에 키를 넣지 않습니다.
       - key: OPENAI_API_KEY
         sync: false

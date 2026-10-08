@@ -5,7 +5,7 @@
 <br />
 
 상담 앱을 웹에도 배포하였으니 함께보셔도 좋습니다. \
-: <https://homeappliance-repair-service-chatagent.onrender.com/>
+: <https://homeappliance-repair-service-chatagent-production-c77d.up.railway.app/> (2026-10-08 Render → Railway 이전)
 
 ***
 

@@ -94,3 +94,59 @@ python src/capstone_eval.py --mode hybrid_code
 ```
 
 측정 결과 파일: `results/holdout/20261004_0755_holdout_baseline.csv`, `20261004_0750_holdout_current.csv`, `20261004_0750_holdout_hybrid_code.csv`
+
+---
+
+## 10/07~10/08: 검수 Markdown + Parent-Child + Qdrant + 재정렬 (`parent_rerank*`, `child_rerank_code`)
+
+```
+10/07  ④ parent_rerank_code ── 검수 Markdown · Parent-Child 청킹 · Qdrant(dense+BM25 → RRF) · Cross-encoder 재정렬
+         │
+10/08  ⑤ child_rerank_code ─── + 구어체 동의어 확장 + child 단위 재정렬 + 안전 경고 고정   현재 기본값
+```
+
+| 구성 | 코드 위치 | 내용 |
+|---|---|---|
+| PDF 직접 추출·검수 | `src/extract_pages.py` → `data/pages/p###.md` | PyMuPDF로 2단·표를 Markdown으로 추출한 뒤 사람이 원본 이미지와 대조해 40쪽 수정. 표시창 글꼴 오추출(dE2→`dEz`, IE→`1E`, CL→`[L`)과 17쪽 깨진 글자 정리 |
+| Parent-Child 청킹 | `load_parents`, `child_documents` | parent = `#`·`##` 제목 섹션(1500자 초과 시 표의 같은 항목·문단 단위로 분할), child = 250자 조각 또는 표 한 행. parent 77개 / child 593개 |
+| Qdrant 하이브리드 | `parent_child_index`, `ParentChildRetriever` | child마다 dense(OpenAI)·sparse(BM25, IDF는 Qdrant) 벡터 저장, 서버 내 RRF 결합. 로컬 파일 모드, 내용이 바뀔 때만 재색인 |
+| 재정렬 | `reranker` | `BAAI/bge-reranker-v2-m3` Cross-encoder, Top-5 parent를 LLM에 전달 |
+| 동의어 확장 | `QUERY_SYNONYMS`, `expand_query` | 시끄럽→소음, 흔들→진동, 김→증기, 쉰내→냄새 등(연기는 증기로 바꾸지 않음) |
+| child 단위 재정렬 | `rerank_unit="child"` | parent 점수 = 가장 높은 child 점수. 증상 여러 개를 묶은 긴 parent의 점수 희석 방지, 검색 1.5초 → 0.8초 |
+| 안전 경고 고정 | `SAFETY_TERMS`, `_safety_parents` | 연기·타는 냄새·감전 등 표현이 있으면 3~9쪽 안전 경고 parent를 최대 2개 앞에 둠('연기가 나요'가 57쪽 '증기, 고장 아님'에 밀리던 문제) |
+
+### 홀드아웃 검색 결과 (정답 페이지가 있는 34문항)
+
+| 방식 | 근거 검색 | MRR |
+|---|---|---|
+| hybrid_code | 31/34 | 0.79 |
+| parent_rerank_code (검수 전 자동 추출) | 33/34 | 0.94 |
+| parent_rerank_code (검수 후) | 33/34 | 0.96 |
+| child_rerank_code | 34/34 | 1.00 |
+
+- **child_rerank_code의 1.00은 낙관적인 값입니다.** 동의어 규칙을 홀드아웃 실패 문항(H25·H29)을 보고 만들었으므로, 홀드아웃은 더 이상 독립 검증셋이 아닙니다. 개발셋 10문항에서는 나빠진 문항이 없고, Q03(쉰내)이 새로 해결됐습니다.
+- 반환 개수가 다릅니다(기존 청크 8개, 새 방식 parent 5개).
+
+## 10/08: 원인 포함률 검사 (답변 패턴 하네스)
+
+고장 표에서 같은 증상의 행 = 설명서 원인 목록입니다(예: UE 6개). 고객 증상의 원인을 답변이 모두 다루도록 코드로 검사합니다.
+
+| 단계 | 코드 위치 | 내용 |
+|---|---|---|
+| 원인 목록 선택 | `symptom_causes` | 오류코드가 있으면 그 코드의 행, 없으면 재정렬 점수가 가장 높은 행의 증상(점수 ≥ `CAUSE_MIN_SCORE` 0.6). 원인 2개 이상만 |
+| 생성에 전달 | `format_cause_list` | '설명서 원인 목록(모두 안내할 것)'을 참고 문서에 추가 |
+| 검사·재생성 | `missing_causes`, `review_answer` | 그 원인만의 고유 핵심어가 답변(또는 고객 질문)에 없으면 빠진 원인으로 보고 피드백 재생성 |
+| 최종 보완 | `regenerate` | 그래도 빠진 원인은 설명서 문장을 그대로 덧붙임 |
+| 예외 | `cause_check_applies` | 기사 점검 권장, 작업을 불안해하는 고객, 연기·감전 등 위험 상황, FE·PE·tE·vs |
+
+홀드아웃 상담 평가(`20261008_1926_holdout_child_rerank_code.csv`, 1회 측정):
+
+| 지표 | hybrid_code (10/04) | child_rerank_code (10/08) |
+|---|---|---|
+| 범위 분류 | 48/50 | 48/50 |
+| 상담 분류 | 45/50 | 47/50 |
+| 인용 유효성 | 50/50 | 50/50 |
+| 원인 포함률 (모델 답변, 보완 전) | - | 61/69 (88%), 검사 15문항 중 전부 포함 9문항 |
+
+- 실패: H04·H10·H47(기존과 같음), H49('세탁기가 이상해요'에 자가 점검으로 답함, 신규). H13·H15·H28 해결.
+- 원인 포함률 측정 뒤 판정 규칙을 보완했습니다(활용형 '얼어/얼었/동결', 고객이 이미 말한 원인). 저장된 답변으로 다시 채점하면 63/69(91%)이고, 이 규칙으로 상담을 다시 실행하지는 않았습니다.

@@ -7,3 +7,5 @@ __pycache__/
 eval/
 results/
 src/
+qdrant_db/
+data/page_images/

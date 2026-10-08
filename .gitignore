@@ -3,3 +3,7 @@
 __pycache__/
 *.pyc
 .gradio/
+
+# 다시 만들 수 있는 파일(Qdrant 색인, 검수용 페이지 이미지)
+qdrant_db/
+**/data/page_images/

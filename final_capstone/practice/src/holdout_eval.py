@@ -9,6 +9,7 @@ LLM 평가자 없이 코드로만 판정합니다.
 - scope_ok    : 제품 범위 분류가 정답과 일치하는가
 - route_ok    : 상담 분류가 허용 분류 안에 드는가
 - citation_ok : 답변이 인용한 페이지가 모두 실제 검색된 페이지인가
+- 원인 포함률 : 고객 증상의 설명서 원인 중 모델 답변이 다룬 비율(검사 대상 문항만, 고정 문구 보완 전 기준)
 
   python src/holdout_eval.py --retrieval-only            # 모든 검색 방식의 검색 지표만 비교(임베딩 호출만)
   python src/holdout_eval.py --mode hybrid_code          # 상담까지 실행(질문당 OpenAI 호출 2~3회)
@@ -77,6 +78,10 @@ def run_full(app, mode, questions):
             "route_ok": result["route"] in item["acceptable_routes"],
             # 인용이 없는 것은 위반이 아닙니다(범위 외 안내 등). 인용했다면 검색된 페이지여야 합니다.
             "citation_ok": cited <= set(result["retrieved_pages"]),
+            "cause_check": result.get("cause_check", False),
+            "causes_total": len(result.get("causes", [])) if result.get("cause_check") else 0,
+            "causes_missed": len(result.get("causes_missed_by_model", [])),
+            "causes_missed_list": " / ".join(result.get("causes_missed_by_model", [])),
             **marks,
         }
         rows.append(row)
@@ -100,6 +105,11 @@ def run_full(app, mode, questions):
     hits, total, mrr = summarize_retrieval(rows)
     print(f"{'근거 페이지 검색':<14}{f'{hits}/{total}':>12}{hits / total:>9.0%}")
     print(f"{'검색 MRR':<14}{'':>12}{mrr:>10.2f}")
+    checked = ok[ok["cause_check"]] if "cause_check" in ok.columns else ok.iloc[0:0]
+    if len(checked):
+        total, missed = int(checked["causes_total"].sum()), int(checked["causes_missed"].sum())
+        full = int((checked["causes_missed"] == 0).sum())
+        print(f"{'원인 포함률':<14}{f'{total - missed}/{total}':>12}{(total - missed) / total:>9.0%}   (검사 {len(checked)}문항 중 전부 포함 {full}문항)")
     print(f"실행 오류: {errors}건")
     fails = ok[~ok["scope_ok"] | ~ok["route_ok"] | ~ok["citation_ok"]]
     if len(fails):

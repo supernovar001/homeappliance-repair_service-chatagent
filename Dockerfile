@@ -1,5 +1,5 @@
 # 워시타워 세탁기 A/S 상담 도우미 실행 이미지
-#   빌드: docker build -t washer-consult .          (Render 등 x86 서버용: --platform linux/amd64)
+#   빌드: docker build -t washer-consult .          (Railway 등 x86 서버용: --platform linux/amd64)
 #   실행: docker run --rm -p 7860:7860 -e OPENAI_API_KEY=... washer-consult
 # 기본 검색 방식(child_rerank_code)은 재정렬 모델 때문에 RAM 약 3GB가 필요합니다.
 FROM python:3.11.9-slim
@@ -39,5 +39,5 @@ COPY data/pages ./data/pages
 COPY assets ./assets
 
 EXPOSE 7860
-# app.py가 PORT 환경변수를 읽어 0.0.0.0에 바인딩합니다(Render는 PORT를 주입).
+# app.py가 PORT 환경변수를 읽어 0.0.0.0에 바인딩합니다(Railway는 PORT를 주입).
 CMD ["python", "app.py"]

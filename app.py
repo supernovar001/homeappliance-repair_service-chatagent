@@ -1,18 +1,12 @@
 # -*- coding: utf-8 -*-
 """워시타워 세탁기 A/S 상담 도우미 - Gradio 배포용 앱
-
-노트북(세탁기_고장상담_QA_5개시나리오_LangChain.ipynb)의 상담 기능만 추출했습니다.
-평가 체인(gpt-4o 채점, 노트북 6~10절)은 배포본에서 제외했습니다.
 필요 파일: 매뉴얼 PDF, data/pages/p###.md(검수한 페이지 텍스트, src/extract_pages.py로 생성), assets/langchain_architecture*.png
 필요 환경변수: OPENAI_API_KEY
-  선택: APP_USERNAME, APP_PASSWORD,
-        RETRIEVER_MODE=baseline|current|hybrid|hybrid_code|parent_rerank|parent_rerank_code|child_rerank_code (기본 child_rerank_code),
-        QDRANT_PATH (기본 ./qdrant_db, ':memory:' 가능), RERANK_MODEL (기본 BAAI/bge-reranker-v2-m3)
-
+선택: APP_USERNAME, APP_PASSWORD,
+    RETRIEVER_MODE=baseline|current|hybrid|hybrid_code|parent_rerank|parent_rerank_code|child_rerank_code (기본 child_rerank_code),
+    QDRANT_PATH (기본 ./qdrant_db, ':memory:' 가능), RERANK_MODEL (기본 BAAI/bge-reranker-v2-m3)
 이 파일은 scratchpad/build_app.py 로 노트북에서 생성했습니다.
 """
-
-
 # ===== 1. 실행 환경 및 PDF 경로 (노트북 1절) =====
 import os
 import re
@@ -58,7 +52,6 @@ if PDF_PATH is None:
     raise FileNotFoundError(f"매뉴얼 PDF를 찾을 수 없습니다. app.py와 같은 폴더에 두세요: {PDF_NAME} 또는 manual.pdf")
 print("사용 PDF:", PDF_PATH.name)
 
-
 # ===== 2. 매뉴얼 검색기 (노트북 2절) =====
 # 기본 검색 흐름(parent_rerank_code):
 #   검수한 페이지 Markdown → Parent(섹션)·Child(작은 조각) 청킹 → Qdrant에 child의 dense·BM25 sparse 벡터 저장
@@ -90,14 +83,19 @@ def clean_text(text):
 
 embeddings = OpenAIEmbeddings(model=EMBEDDING_MODEL, api_key=api_key)
 
+# 오류코드는 설명서 표기(dE2, tE …)를 키로 씁니다. 고객 입력은 canonical_code()로 이 표기에 맞춥니다.
 # IE는 55쪽 오류 표와 40쪽 급수구 거름망 청소를 함께 참조합니다.
-# 40쪽의 IE는 표시창 글꼴이라 PDF 추출 시 '1E'로 읽힙니다(검수 Markdown은 IE로 수정).
-ERROR_PAGES = {"LE": [56], "IE": [55, 40], "1E": [55, 40], "OE": [55, 56, 40, 41], "UE": [55], "DE1": [56], "DE2": [56], "DEZ": [56], "DE4": [56], "FE": [56], "PE": [56], "TE": [56], "FF": [56, 42, 43]}
-# 표시창의 IE는 숫자 1E로 보여 고객이 '1E'라고 말하기도 합니다.
+ERROR_PAGES = {"LE": [56], "IE": [55, 40], "OE": [55, 56, 40, 41], "UE": [55], "dE1": [56], "dE2": [56], "dE4": [56], "FE": [56], "PE": [56], "tE": [56], "FF": [56, 42, 43]}
+# 고객이 표시창을 잘못 읽은 표기 → 설명서 표기. 표시창 글꼴에서 IE는 1E로, dE2는 dEz로 보입니다.
+CODE_INPUT_ALIASES = {"1E": "IE", "DEZ": "dE2"}
 CODE_PATTERN = r"(?<![A-Za-z0-9])(?:dE[124z]|LE|IE|1E|OE|UE|FE|PE|tE|FF)(?![A-Za-z])"
-# 설명서의 dE2는 표시창 글꼴(LG_LCD)이라 PDF 텍스트 추출 시 'dEz'로 읽힙니다(검수 Markdown은 dE2로 수정).
-# 기존 검색기는 PDF 추출 텍스트를 쓰고, 고객도 표시창을 dEz로 읽을 수 있어 둘 다 dE2로 인정합니다.
-CODE_TEXT_ALIASES = {"DE2": r"dE[2z]", "DEZ": r"dE[2z]", "IE": r"[I1]E", "1E": r"[I1]E"}
+# 본문에서 코드를 찾을 때 함께 인정하는 표기: 기존 검색기가 쓰는 PDF 추출 텍스트에는 dE2가 'dEz', 40쪽 IE가 '1E'로 남아 있습니다.
+CODE_TEXT_ALIASES = {"dE2": r"dE[2z]", "IE": r"[I1]E"}
+
+def canonical_code(raw):
+    """고객이 입력한 코드(대소문자·오독 포함)를 설명서 표기로 바꿉니다. 예: 'te' → 'tE', 'dEz' → 'dE2', '1E' → 'IE'."""
+    key = raw.upper()
+    return CODE_INPUT_ALIASES.get(key) or next(code for code in ERROR_PAGES if code.upper() == key)
 
 # 검색 전 질문 정규화: 고객이 잘못 읽거나 잘못 쓰기 쉬운 주요 키워드(오류코드·고장 증상)를
 # 설명서에 적힌 표기로 바꿉니다. 오류코드는 표시창의 I·O를 숫자 1·0으로 읽는 경우가 많고,
@@ -143,7 +141,8 @@ def bm25_tokens(text):
     return tokens
 
 def code_regex(code):
-    return re.compile(rf"(?<![A-Za-z]){CODE_TEXT_ALIASES.get(code.upper(), re.escape(code))}(?![A-Za-z])", re.I)
+    code = canonical_code(code)
+    return re.compile(rf"(?<![A-Za-z]){CODE_TEXT_ALIASES.get(code, re.escape(code))}(?![A-Za-z])", re.I)
 
 
 # --- 2-1. Parent-Child 청킹: 검수한 페이지 Markdown(data/pages/p###.md, src/extract_pages.py로 생성) ---
@@ -406,7 +405,7 @@ class ParentChildRetriever(BaseRetriever):
         """질문에 나온 오류코드의 안내 페이지(ERROR_PAGES)에서 그 코드가 적힌 parent를 찾습니다."""
         codes = re.findall(CODE_PATTERN, query, re.I)
         return list(dict.fromkeys(
-            p["parent_id"] for code in reversed(codes) for page in ERROR_PAGES[code.upper()]
+            p["parent_id"] for code in reversed(codes) for page in ERROR_PAGES[canonical_code(code)]
             for p in self.index["parents"].values() if p["page"] == page and code_regex(code).search(p["text"])
         ))
 
@@ -469,7 +468,7 @@ class WasherManualRetriever(BaseRetriever):
     def _get_relevant_documents(self, query: str, *, run_manager: CallbackManagerForRetrieverRun) -> List[Document]:
         query = normalize_query(query) if self.use_query_normalization else unicodedata.normalize("NFC", query)
         codes = re.findall(CODE_PATTERN, query, re.I) if self.use_code_priority else []
-        preferred = list(dict.fromkeys(page for value in reversed(codes) for page in self.error_pages[value.upper()]))
+        preferred = list(dict.fromkeys(page for value in reversed(codes) for page in self.error_pages[canonical_code(value)]))
         # 오류코드 페이지에서 가장 알맞은 청크를 고르려면 전체 청크의 점수가 필요합니다(청크 100여 개라 부담이 적습니다).
         vector_store = self.index["vector_store"]
         ranked = vector_store.similarity_search_with_score(query, k=len(vector_store.store))
@@ -699,7 +698,7 @@ def check_scope(question, history=None):
 # 개발셋·홀드아웃 진단: 실제 증상 질문은 0.75~0.97, 막연한 질문('세탁기가 이상해요')이 0.55라 0.6으로 둡니다.
 CAUSE_MIN_SCORE = 0.6
 CAUSE_MIN_COUNT = 2     # 원인이 이 개수 이상인 증상만 검사합니다(원인이 하나면 '여러 원인 안내'가 의미 없습니다).
-NO_SELF_FIX_CODES = {"FE", "PE", "TE", "VS"}  # 설명서상 고객 조치가 없는 코드: 원인을 나열하지 않고 서비스 센터로 안내합니다.
+NO_SELF_FIX_CODES = {"FE", "PE", "tE", "vs"}  # 설명서상 고객 조치가 없는 코드: 원인을 나열하지 않고 서비스 센터로 안내합니다.
 ANXIOUS_PATTERN = r"무서|겁|두려|자신\s*(이\s*)?없|해도 되는 건지"
 # 원인 질문에서 핵심어를 뽑을 때 버리는 어간(두 글자): 질문 어미와 모든 원인에 흔한 단어입니다.
 CAUSE_STOP_STEMS = {"있나", "않나", "했나", "하나", "나요", "되어", "되었", "아닌", "제품", "세탁", "경우", "사용", "작동",
@@ -710,7 +709,7 @@ def symptom_causes(query, documents):
     rows = list({(r["symptom"], r["cause"]): r for d in documents for r in d.get("cause_rows", [])}.values())
     if not rows:
         return []
-    codes = {code.upper() for code in re.findall(CODE_PATTERN, normalize_query(query), re.I)}
+    codes = {canonical_code(code) for code in re.findall(CODE_PATTERN, normalize_query(query), re.I)}
     if codes:
         codes -= NO_SELF_FIX_CODES
         symptoms = {r["symptom"] for r in rows if any(code_regex(code).search(r["symptom"]) for code in codes)}

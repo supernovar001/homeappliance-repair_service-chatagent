@@ -9,3 +9,10 @@ results/
 src/
 qdrant_db/
 data/page_images/
+frontend/node_modules/
+frontend/dist/
+frontend/test-results/
+frontend/playwright-report/
+tests/
+docs/
+run_production_500*.py

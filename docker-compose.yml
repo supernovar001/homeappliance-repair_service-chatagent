@@ -1,8 +1,25 @@
-# 로컬 개발용 PostgreSQL입니다.
-#   docker compose up -d db
-#   DATABASE_URL=postgresql://washcare:washcare@localhost:5433/washcare
+# 로컬 실행 구성
+#   개발: docker compose up -d db   (DATABASE_URL=postgresql://washcare:washcare@localhost:5433/washcare)
+#   배포 이미지 확인: docker compose --profile web up --build   (http://localhost:8000, 볼륨에 Qdrant 색인 유지)
 # 테스트는 같은 서버의 washcare_test DB를 씁니다(tests/conftest.py가 만듭니다).
 services:
+  web:
+    profiles: ["web"]
+    build: .
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://washcare:washcare@db:5432/washcare
+      QDRANT_PATH: /data/qdrant
+      PORT: "8000"
+      BASE_URL: http://localhost:8000
+    ports:
+      - "8000:8000"
+    volumes:
+      - webdata:/data
+    depends_on:
+      db:
+        condition: service_healthy
+
   db:
     image: postgres:17-alpine
     environment:
@@ -20,3 +37,4 @@ services:
 
 volumes:
   pgdata:
+  webdata:

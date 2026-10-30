@@ -39,8 +39,9 @@
 - [ ] **사용자** Railway 웹 서비스 메모리 한도 확인 (4GB 이상 권장, 재정렬 모델이 약 2GB)
 - [ ] **사용자** Google OAuth 웹 클라이언트 만들기, 리디렉션 URI 3개 등록(README "Railway 배포" 표), 동의 화면을 **프로덕션**으로 게시
 - [ ] **사용자** Railway에 PostgreSQL·Volume(`/data`)·환경변수 추가 (README "Railway 배포")
-- [ ] 브랜치 push, `main` 병합(= 배포). 사용자 확인 후에만
-- [ ] 화면 시안 이미지(`docs/mockups/`)를 커밋할지 결정
+- [x] 브랜치 push, PR [#1](https://github.com/supernovar001/homeappliance-repair_service-chatagent/pull/1) 생성 (2026-10-30)
+- [ ] `main` 병합(= 배포). 위 사용자 항목을 마치고 사용자 확인 후에만
+- [x] 화면 시안 이미지(`docs/mockups/`) 커밋 (2026-10-30)
 - [ ] (이번 범위 밖) 기준 평가에서 이미 틀리던 5문항(H03, H04, H10, H21, H47) 개선 여부
 
 ## 3. 특이사항 기록

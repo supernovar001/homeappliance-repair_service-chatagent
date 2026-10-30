@@ -1,0 +1,22 @@
+# 로컬 개발용 PostgreSQL입니다.
+#   docker compose up -d db
+#   DATABASE_URL=postgresql://washcare:washcare@localhost:5433/washcare
+# 테스트는 같은 서버의 washcare_test DB를 씁니다(tests/conftest.py가 만듭니다).
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: washcare
+      POSTGRES_PASSWORD: washcare
+      POSTGRES_DB: washcare
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U washcare"]
+      interval: 2s
+      retries: 15
+
+volumes:
+  pgdata:

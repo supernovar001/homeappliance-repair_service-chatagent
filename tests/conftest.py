@@ -7,6 +7,7 @@
 (앱 코드에는 로그인 우회가 없습니다). OpenAI는 호출하지 않습니다.
 """
 import os
+import time
 import uuid
 
 import psycopg
@@ -58,9 +59,31 @@ def db():
 
 
 @pytest.fixture
-def app():
+def engine_fake():
+    from backend.engine import FakeEngine
+    return FakeEngine()
+
+
+@pytest.fixture
+def app(engine_fake):
     from backend.main import create_app
-    return create_app()
+    app = create_app(engine_fake, background=False)
+    yield app
+    app.state.jobs.executor.shutdown(wait=True)
+
+
+@pytest.fixture
+def wait_done():
+    """작업이 끝날 때까지 상태를 조회합니다(작업은 스레드에서 돕니다)."""
+    def wait(client, request_id, timeout=10):
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            body = client.get(f"/api/requests/{request_id}").json()
+            if body["status"] not in ("queued", "running"):
+                return body
+            time.sleep(0.05)
+        raise AssertionError("작업이 끝나지 않았습니다.")
+    return wait
 
 
 class LoggedIn:

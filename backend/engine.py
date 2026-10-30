@@ -4,11 +4,41 @@
 app.py를 모듈로 쪼개지 않는 이유: 평가 스크립트가 app.retriever를 바꿔 끼워 검색 방식을 비교합니다.
 테스트는 OpenAI를 부르지 않는 FakeEngine을 씁니다.
 """
+import os
 import re
 import struct
+import time
 import zlib
 import threading
 from functools import lru_cache
+
+
+def _cpu_quota():
+    """컨테이너(cgroup v2)에 걸린 CPU 한도. 호스트 코어 수와 다를 수 있습니다."""
+    try:
+        quota, period = open("/sys/fs/cgroup/cpu.max").read().split()
+        return "제한 없음" if quota == "max" else f"{int(quota) / int(period):g}개"
+    except (OSError, ValueError):
+        return "-"
+
+
+def _set_torch_threads():
+    """TORCH_NUM_THREADS가 있으면 재정렬 모델의 CPU 스레드 수로 씁니다. 시작 로그에 CPU 수와 함께 남깁니다."""
+    import torch
+    threads = os.getenv("TORCH_NUM_THREADS", "").strip()
+    if threads.isdigit() and int(threads) > 0:
+        torch.set_num_threads(int(threads))
+    print(f"CPU {os.cpu_count()}개(컨테이너 한도 {_cpu_quota()}), torch 스레드 {torch.get_num_threads()}개")
+
+
+def _timed(rerank_scores):
+    """재정렬 호출마다 쌍 수와 걸린 시간(잠금 대기 포함)을 남깁니다. 검색 구간 중 재정렬 몫을 따로 보려는 것입니다."""
+    def timed(pairs):
+        start = time.perf_counter()
+        scores = rerank_scores(pairs)
+        print(f"재정렬 {len(pairs)}쌍 {time.perf_counter() - start:.2f}초")
+        return scores
+    return timed
 
 
 class WasherEngine:
@@ -26,7 +56,12 @@ class WasherEngine:
             if self.ai is None:
                 import app as ai
                 if isinstance(ai.retriever, ai.ParentChildRetriever):
+                    _set_torch_threads()
                     ai.reranker()
+                    # 검색기는 호출할 때마다 모듈의 rerank_scores를 찾으므로, 바꿔 끼우면 서비스 호출만 시간을 잽니다(평가는 app.py를 직접 씀).
+                    ai.rerank_scores = _timed(ai.rerank_scores)
+                    # 첫 predict는 연산 준비로 느립니다. 시작할 때 한 번 돌려 첫 질문이 그 시간을 기다리지 않게 합니다.
+                    ai.rerank_scores([("워밍업", "워밍업")])
                 ai.demo.queue(default_concurrency_limit=1)  # /demo는 서비스 작업과 CPU를 나눠 쓰므로 한 번에 하나만
                 self.ai = ai
         return self

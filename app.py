@@ -969,11 +969,21 @@ def _early_result(answer, route, scope, state):
         "symptom": "", "error_code": error_code(state["question"], state["history"]), "checklist": [],
     }
 
+# 범위 분류(LLM)와 검색은 서로의 결과가 필요 없어 동시에 돌립니다. 검색을 이 풀에 먼저 맡기고 범위 분류를 기다립니다.
+# 범위 밖이거나 되묻기로 끝나면 미리 받은 검색 결과는 버립니다(임베딩 1회·재정렬 1회 비용).
+from concurrent.futures import ThreadPoolExecutor
+PREFETCH = ThreadPoolExecutor(max_workers=8, thread_name_prefix="prefetch")
+
+def search_query(state):
+    """최근 고객 발화 3개와 이번 질문을 이어 검색 질의로 씁니다."""
+    return " ".join([m["content"] for m in state["history"] if m["role"] == "user"][-3:] + [state["question"]])
+
 def judge_scope(state):
     """1단계 상담 대상 여부 판단: 워시타워 세탁기 문의가 아니면 안내 문구로 끝냅니다."""
     _emit(state, "scope_check")
+    prefetch = PREFETCH.submit(retrieve, search_query(state))
     scope = check_scope(state["question"], state["history"])
-    state = {**state, "scope": scope}
+    state = {**state, "scope": scope, "prefetch": prefetch}
     if scope.product in OUT_OF_SCOPE_MESSAGES:
         state["result"] = _early_result(f"판단: {OUT_OF_SCOPE_LABEL}\n이유: {scope.reason}\n\n{OUT_OF_SCOPE_MESSAGES[scope.product]}", OUT_OF_SCOPE_LABEL, scope, state)
     return state
@@ -1003,8 +1013,8 @@ def search_documents(state):
         return state
     _emit(state, "retrieving")
     history = state["history"]
-    query = " ".join([m["content"] for m in history if m["role"] == "user"][-3:] + [state["question"]])
-    documents = retrieve(query)
+    query = search_query(state)
+    documents = state["prefetch"].result() if "prefetch" in state else retrieve(query)
     allowed = list(dict.fromkeys(d["page"] for d in documents))  # 한 페이지에서 여러 청크가 나올 수 있어 중복을 없앱니다.
     causes = symptom_causes(query, documents)
     inputs = {

@@ -83,7 +83,15 @@ python src/holdout_eval.py --mode child_rerank_code   # 상담 AI 회귀 평가 
 4. 웹 서비스 메모리는 4GB 이상을 권장합니다(재정렬 모델이 약 2GB를 씁니다).
 
 Google Cloud에서는 OAuth 동의 화면(External, 범위 openid·email·profile)을 **프로덕션**으로 게시하고,
-웹 클라이언트의 승인된 리디렉션 URI에 `{BASE_URL}/auth/google/callback`을 등록합니다.
+웹 클라이언트의 승인된 리디렉션 URI에 `{BASE_URL}/auth/google/callback`을 등록합니다. 등록할 URI는 3개입니다.
+
+| 용도 | 승인된 리디렉션 URI |
+|---|---|
+| Railway 배포 | `https://homeappliance-repair-service-chatagent-production-c77d.up.railway.app/auth/google/callback` |
+| 로컬 개발(Vite, `BASE_URL=http://localhost:5173`) | `http://localhost:5173/auth/google/callback` |
+| 로컬 백엔드 단독(`BASE_URL=http://localhost:8000`) | `http://localhost:8000/auth/google/callback` |
+
+`BASE_URL`과 등록한 URI의 주소가 한 글자라도 다르면 Google이 `redirect_uri_mismatch`로 거부합니다(끝의 `/`, http/https 포함).
 
 ## 개인정보와 보관
 

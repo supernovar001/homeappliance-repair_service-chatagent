@@ -37,7 +37,7 @@
 - [ ] 배포 후 Railway(CPU)에서 응답시간 P95 확인 (I-06)
 - [ ] Docker 이미지 빌드 후 재시작해도 데이터·Qdrant 색인이 유지되는지(AT-19). 8GB Mac에서는 무거워 시간 확보 필요
 - [ ] **사용자** Railway 웹 서비스 메모리 한도 확인 (4GB 이상 권장, 재정렬 모델이 약 2GB)
-- [ ] **사용자** Google OAuth 웹 클라이언트 만들기, 리디렉션 URI 3개 등록, 동의 화면을 **프로덕션**으로 게시
+- [ ] **사용자** Google OAuth 웹 클라이언트 만들기, 리디렉션 URI 3개 등록(README "Railway 배포" 표), 동의 화면을 **프로덕션**으로 게시
 - [ ] **사용자** Railway에 PostgreSQL·Volume(`/data`)·환경변수 추가 (README "Railway 배포")
 - [ ] 브랜치 push, `main` 병합(= 배포). 사용자 확인 후에만
 - [ ] 화면 시안 이미지(`docs/mockups/`)를 커밋할지 결정

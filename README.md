@@ -73,6 +73,7 @@ zsh는 대화형 셸에서 `#`을 주석으로 처리하지 않으므로, 명령
 | `RETENTION_DAYS` | 선택 | 상담 원문 보관 기간(기본 90일) |
 | `MAX_CONCURRENT_CONSULTS` | 선택 | 동시에 만드는 답변 수(기본 2) |
 | `OPENAI_TIMEOUT` | 선택 | OpenAI 호출 하나의 제한 시간(기본 60초) |
+| `TORCH_NUM_THREADS` | 선택 | 재정렬 모델의 CPU 스레드 수. 비우면 torch 기본값을 씁니다. 시작 로그의 "CPU … 컨테이너 한도 …"를 보고 한도에 맞춥니다 |
 | `APP_USERNAME`, `APP_PASSWORD` | 선택 | `/demo` Gradio 화면의 비밀번호 |
 
 ## 테스트

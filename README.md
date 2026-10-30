@@ -32,17 +32,28 @@ docs/DEV_NOTES.md       개발 노트 (확인할 점·특이사항·설계 결�
 
 필요한 것: Python 3.11 이상, Node 24, Docker(PostgreSQL용), OpenAI API 키, Google OAuth 클라이언트.
 
+처음 한 번 준비합니다. `.env`는 `.env.example`을 복사해 값을 채웁니다(아래 표). DB는 localhost:5433에 뜹니다.
+
 ```bash
 pip install -r requirements-dev.txt
 (cd frontend && npm ci)
-
-cp .env.example .env              # 값 채우기 (아래 표)
-docker compose up -d db            # PostgreSQL (localhost:5433)
+cp .env.example .env
+docker compose up -d db
 alembic upgrade head
-
-uvicorn backend.main:app --port 8000   # 시작할 때 검색 색인과 재정렬 모델을 불러와 수십 초 걸립니다
-(cd frontend && npm run dev)           # http://localhost:5173 (API는 8000으로 넘깁니다)
 ```
+
+터미널 두 개에서 각각 실행합니다. 백엔드는 시작할 때 검색 색인과 재정렬 모델을 불러와 20~30초 걸리고,
+`Application startup complete`가 나오면 http://localhost:5173 에 접속합니다(Vite가 API를 8000으로 넘깁니다).
+
+```bash
+uvicorn backend.main:app --port 8000
+```
+
+```bash
+cd frontend && npm run dev
+```
+
+zsh는 대화형 셸에서 `#`을 주석으로 처리하지 않으므로, 명령 뒤에 주석을 붙여 붙여넣으면 인자로 들어가 실패합니다.
 
 로컬에서 Vite(5173)로 접속할 때는 `.env`에 `BASE_URL=http://localhost:5173`을 넣습니다. Google 로그인 콜백이 Vite를 거쳐 백엔드로 갑니다.
 
